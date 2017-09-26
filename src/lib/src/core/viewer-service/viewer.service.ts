@@ -23,6 +23,7 @@ import { Rect } from './../models/rect';
 import { SwipeDragEndCounter } from './swipe-drag-end-counter';
 
 
+import { PinchStatus } from '../models/pinchStatus';
 import '../ext/svg-overlay';
 import '../../rxjs-extension';
 import * as d3 from 'd3';
@@ -31,7 +32,6 @@ declare const OpenSeadragon: any;
 
 @Injectable()
 export class ViewerService implements OnInit {
-
   private viewer: any;
   private svgNode: any;
   private options: Options;
@@ -42,6 +42,7 @@ export class ViewerService implements OnInit {
 
   public isCanvasPressed: Subject<boolean> = new Subject<boolean>();
   private swipeDragEndCounter = new SwipeDragEndCounter();
+  private pinchStatus = new PinchStatus();
   private currentCenter: ReplaySubject<Point> = new ReplaySubject();
   private currentPageIndex: ReplaySubject<number> = new ReplaySubject();
   private dragStartPosition: any;
@@ -321,8 +322,30 @@ export class ViewerService implements OnInit {
       this.zoomInGesture(e.center);
       // Pinch In
     } else {
-      this.zoomOutGesture();
+      let gestureId = e.gesturePoints[0].id;
+      this.zoomOutPinchGesture(gestureId);
     }
+  }
+
+  /**
+   * Process zoom out pinch (pinch in) gesture
+   *
+   * Zoom out and toggle to dashboard when all zoomed out.
+   * Stop before toggling to dashboard.
+   *
+   * @param {number} gestureId id of current pinch gesture
+   */
+  zoomOutPinchGesture(gestureId?: number): void {
+      if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
+        this.pinchStatus.shouldStop = true;
+        this.zoomOut();
+      } else if (this.modeService.mode === ViewerMode.PAGE) {
+        if (!this.pinchStatus.shouldStop || gestureId === this.pinchStatus.previousGestureId + 2) {
+          this.pinchStatus.shouldStop = false;
+          this.toggleToDashboard();
+        }
+        this.pinchStatus.previousGestureId = gestureId;
+      }
   }
 
   /**
@@ -341,13 +364,12 @@ export class ViewerService implements OnInit {
     }
   }
 
+
   zoomOutGesture(): void {
-    if (this.modeService.mode === ViewerMode.PAGE || this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
-      if (this.isViewportLargerThanPage()) {
-        this.toggleToDashboard();
-      } else {
-        this.zoomOut();
-      }
+    if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
+      this.zoomOut();
+    } else if (this.modeService.mode === ViewerMode.PAGE) {
+      this.toggleToDashboard();
     }
   }
 
