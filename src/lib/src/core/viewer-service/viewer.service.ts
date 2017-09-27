@@ -89,7 +89,11 @@ export class ViewerService implements OnInit {
   }
 
   public zoomTo(level: number, position?: Point): void {
-    this.viewer.viewport.zoomTo(level, position);
+    this.viewer.viewport.zoomto(level, position);
+  }
+
+  public zoomBy(zoomFactor: number, position?: Point): void {
+    this.viewer.viewport.zoomBy(zoomFactor, position);
   }
 
   public home(): void {
@@ -237,28 +241,43 @@ export class ViewerService implements OnInit {
   }
 
 
-  zoomIn(dblClickZoom?: boolean): void {
-    const zoomFactor = dblClickZoom ? ViewerOptions.zoom.dblClickZoomFactor : ViewerOptions.zoom.zoomFactor;
+  zoomIn(): void {
     if (this.modeService.mode !== ViewerMode.PAGE_ZOOMED) {
       this.modeService.mode = ViewerMode.PAGE_ZOOMED;
     }
-    this.zoomTo(this.getZoom() + zoomFactor);
+    this.zoomBy(ViewerOptions.zoom.zoomFactor);
   }
 
   zoomOut(): void {
     if (this.isViewportLargerThanPage()) {
       this.toggleToPage();
     } else {
-      this.zoomTo(this.getZoom() - ViewerOptions.zoom.zoomFactor);
+      this.zoomBy(Math.pow(ViewerOptions.zoom.zoomFactor, -1));
     }
   }
 
-  zoomInAtPoint(position: Point): void {
+  zoomInAtPoint(position: Point, zoomFactor?: number): void {
     position = this.viewer.viewport.pointFromPixel(position);
+    if (typeof zoomFactor === 'undefined') {
+      zoomFactor = ViewerOptions.zoom.zoomFactor;
+    }
+
     if (this.modeService.mode !== ViewerMode.PAGE_ZOOMED) {
       this.modeService.mode = ViewerMode.PAGE_ZOOMED;
     }
-    this.zoomTo(this.getZoom() + ViewerOptions.zoom.zoomFactor, position);
+    this.zoomBy(zoomFactor, position);
+  }
+
+  zoomOutAtPoint(position: Point, zoomFactor?: number): void {
+    position = this.viewer.viewport.pointFromPixel(position);
+    if (typeof zoomFactor === 'undefined') {
+      zoomFactor = Math.pow(ViewerOptions.zoom.zoomFactor, -1);
+    }
+    if (this.isViewportLargerThanPage()) {
+      this.toggleToPage();
+    } else {
+      this.zoomBy(zoomFactor, position);
+    }
   }
 
 
@@ -301,15 +320,14 @@ export class ViewerService implements OnInit {
   /**
    * Scroll-handler
    */
-  scrollHandler = (e: any) => {
-    const event = e.originalEvent;
-    const delta = (event.wheelDelta) ? event.wheelDelta : -event.deltaY;
+  scrollHandler = (event: any) => {
+    const zoomFactor = Math.pow( this.options.zoomPerScroll, event.scroll );
     // Scrolling up
-    if (delta > 0) {
-      this.zoomInGesture();
+    if (event.scroll > 0) {
+      this.zoomInGesture(event.position, zoomFactor);
       // Scrolling down
-    } else if (delta < 0) {
-      this.zoomOutGesture();
+    } else if (event.scroll < 0) {
+      this.zoomOutGesture(event.position, zoomFactor);
     }
   }
 
@@ -317,12 +335,13 @@ export class ViewerService implements OnInit {
    * Pinch-handler
   */
   pinchHandler = (event: any) => {
+    const zoomFactor = event.distance / event.lastDistance;
     // Pinch Out
     if (event.distance > event.lastDistance) {
-      this.zoomInGesture(event.center);
+      this.zoomInGesture(event.center, zoomFactor);
       // Pinch In
     } else {
-      this.zoomOutPinchGesture(event);
+      this.zoomOutPinchGesture(event, zoomFactor);
     }
   }
 
@@ -334,16 +353,15 @@ export class ViewerService implements OnInit {
    *
    * @param {any} pinch event from current pinch gesture
    */
-  zoomOutPinchGesture(event: any): void {
-    let gestureId = event.gesturePoints[0].id;
+  zoomOutPinchGesture(event: any, zoomFactor: number): void {
+    const gestureId = event.gesturePoints[0].id;
       if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
         this.pinchStatus.shouldStop = true;
 
         if (this.isViewportLargerThanPage()) {
           this.toggleToPage();
         } else {
-          let centerPt = this.viewer.viewport.pointFromPixel( event.center, true );
-          this.viewer.viewport.zoomBy( event.distance / event.lastDistance, centerPt, true );
+          this.zoomInAtPoint(event.center, zoomFactor);
         }
 
       } else if (this.modeService.mode === ViewerMode.PAGE) {
@@ -359,22 +377,21 @@ export class ViewerService implements OnInit {
    *
    * @param {Point} point to zoom to. If not set, the viewer will zoom to center
    */
-  zoomInGesture(position?: Point): void {
+  zoomInGesture(position: Point, zoomFactor?: number): void {
     if (this.modeService.mode === ViewerMode.DASHBOARD) {
       this.toggleToPage();
     } else {
       if (position) {
-        this.zoomInAtPoint(position);
+        this.zoomInAtPoint(position, zoomFactor);
       } else {
         this.zoomIn();
       }
     }
   }
 
-
-  zoomOutGesture(): void {
+  zoomOutGesture(position: Point, zoomFactor?: number): void {
     if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
-      this.zoomOut();
+      this.zoomOutAtPoint(position, zoomFactor);
     } else if (this.modeService.mode === ViewerMode.PAGE) {
       this.toggleToDashboard();
     }
@@ -406,7 +423,7 @@ export class ViewerService implements OnInit {
     // Page is fitted vertically, so dbl-click zooms in
     if (this.modeService.mode === ViewerMode.PAGE) {
       this.modeService.mode = ViewerMode.PAGE_ZOOMED;
-      this.zoomIn(true);
+      this.zoomInAtPoint(event.position, ViewerOptions.zoom.dblClickZoomFactor);
     } else {
       this.modeService.mode = ViewerMode.PAGE;
       const requestedPage: number = this.getOverlayIndexFromClickEvent(target);
