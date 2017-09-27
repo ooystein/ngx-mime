@@ -341,6 +341,7 @@ export class ViewerService implements OnInit {
    * Pinch-handler
   */
   pinchHandler = (event: any) => {
+    console.log("pinch");
     const zoomFactor = event.distance / event.lastDistance;
     // Pinch Out
     if (event.distance > event.lastDistance) {
@@ -363,7 +364,9 @@ export class ViewerService implements OnInit {
     const gestureId = event.gesturePoints[0].id;
       if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
         this.pinchStatus.shouldStop = true;
-
+        setTimeout(() => {
+          this.pinchStatus.shouldStop = false;
+        }, 100);
         if (this.isViewportLargerThanPage()) {
           this.toggleToPage();
         } else {
@@ -391,11 +394,6 @@ export class ViewerService implements OnInit {
       this.toggleToPage();
     } else {
       this.zoomInAtPoint(event.center, zoomFactor);
-
-      const centerPt = this.viewer.viewport.pointFromPixel( event.center, true );
-      const lastCenterPt = this.viewer.viewport.pointFromPixel( event.lastCenter, true );
-      const panByPt = lastCenterPt.minus( centerPt );
-      this.viewer.viewport.panBy( panByPt, true );
     }
   }
   /**
@@ -597,6 +595,7 @@ export class ViewerService implements OnInit {
   }
 
   private dragHandler = (e: any) => {
+    console.log("dragHandler");
     this.viewer.panHorizontal = true;
     if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
       const dragEndPosision = e.position;
@@ -619,6 +618,7 @@ export class ViewerService implements OnInit {
   }
 
   private swipeToPage(e: any) {
+    console.log("drag-end-handler");
 
     const speed: number = e.speed;
     const dragEndPosision = e.position;
