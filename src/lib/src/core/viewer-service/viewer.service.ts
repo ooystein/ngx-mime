@@ -316,14 +316,13 @@ export class ViewerService implements OnInit {
   /**
    * Pinch-handler
   */
-  pinchHandler = (e: any) => {
+  pinchHandler = (event: any) => {
     // Pinch Out
-    if (e.distance > e.lastDistance) {
-      this.zoomInGesture(e.center);
+    if (event.distance > event.lastDistance) {
+      this.zoomInGesture(event.center);
       // Pinch In
     } else {
-      let gestureId = e.gesturePoints[0].id;
-      this.zoomOutPinchGesture(gestureId);
+      this.zoomOutPinchGesture(event);
     }
   }
 
@@ -333,12 +332,20 @@ export class ViewerService implements OnInit {
    * Zoom out and toggle to dashboard when all zoomed out.
    * Stop before toggling to dashboard.
    *
-   * @param {number} gestureId id of current pinch gesture
+   * @param {any} pinch event from current pinch gesture
    */
-  zoomOutPinchGesture(gestureId?: number): void {
+  zoomOutPinchGesture(event: any): void {
+    let gestureId = event.gesturePoints[0].id;
       if (this.modeService.mode === ViewerMode.PAGE_ZOOMED) {
         this.pinchStatus.shouldStop = true;
-        this.zoomOut();
+
+        if (this.isViewportLargerThanPage()) {
+          this.toggleToPage();
+        } else {
+          let centerPt = this.viewer.viewport.pointFromPixel( event.center, true );
+          this.viewer.viewport.zoomBy( event.distance / event.lastDistance, centerPt, true );
+        }
+
       } else if (this.modeService.mode === ViewerMode.PAGE) {
         if (!this.pinchStatus.shouldStop || gestureId === this.pinchStatus.previousGestureId + 2) {
           this.pinchStatus.shouldStop = false;
