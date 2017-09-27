@@ -241,18 +241,24 @@ export class ViewerService implements OnInit {
   }
 
 
-  zoomIn(): void {
+  zoomIn(zoomFactor?: number): void {
+    if (typeof zoomFactor === 'undefined') {
+      zoomFactor = ViewerOptions.zoom.zoomFactor;
+    }
     if (this.modeService.mode !== ViewerMode.PAGE_ZOOMED) {
       this.modeService.mode = ViewerMode.PAGE_ZOOMED;
     }
-    this.zoomBy(ViewerOptions.zoom.zoomFactor);
+    this.zoomBy(zoomFactor);
   }
 
-  zoomOut(): void {
+  zoomOut(zoomFactor?: number): void {
+    if (typeof zoomFactor === 'undefined') {
+      zoomFactor = Math.pow(ViewerOptions.zoom.zoomFactor, -1);
+    }
     if (this.isViewportLargerThanPage()) {
       this.toggleToPage();
     } else {
-      this.zoomBy(Math.pow(ViewerOptions.zoom.zoomFactor, -1));
+      this.zoomBy(zoomFactor);
     }
   }
 
@@ -321,7 +327,7 @@ export class ViewerService implements OnInit {
    * Scroll-handler
    */
   scrollHandler = (event: any) => {
-    const zoomFactor = Math.pow( this.options.zoomPerScroll, event.scroll );
+    const zoomFactor = Math.pow( ViewerOptions.zoom.zoomFactor, event.scroll );
     // Scrolling up
     if (event.scroll > 0) {
       this.zoomInGesture(event.position, zoomFactor);
@@ -338,7 +344,7 @@ export class ViewerService implements OnInit {
     const zoomFactor = event.distance / event.lastDistance;
     // Pinch Out
     if (event.distance > event.lastDistance) {
-      this.zoomInGesture(event.center, zoomFactor);
+      this.zoomInPinchGesture(event, zoomFactor);
       // Pinch In
     } else {
       this.zoomOutPinchGesture(event, zoomFactor);
@@ -346,12 +352,12 @@ export class ViewerService implements OnInit {
   }
 
   /**
-   * Process zoom out pinch (pinch in) gesture
+   * Process zoom out pinch gesture (pinch in)
    *
    * Zoom out and toggle to dashboard when all zoomed out.
    * Stop before toggling to dashboard.
    *
-   * @param {any} pinch event from current pinch gesture
+   * @param {any} event from pinch gesture
    */
   zoomOutPinchGesture(event: any, zoomFactor: number): void {
     const gestureId = event.gesturePoints[0].id;
@@ -361,7 +367,7 @@ export class ViewerService implements OnInit {
         if (this.isViewportLargerThanPage()) {
           this.toggleToPage();
         } else {
-          this.zoomInAtPoint(event.center, zoomFactor);
+          this.zoomOutAtPoint(event.center, zoomFactor);
         }
 
       } else if (this.modeService.mode === ViewerMode.PAGE) {
@@ -373,6 +379,25 @@ export class ViewerService implements OnInit {
       }
   }
 
+  /**
+   * Process zoom in pinch gesture (pinch out)
+   *
+   * Toggle to page mode and Zoom in
+   *
+   * @param {any} event from pinch gesture
+   */
+  zoomInPinchGesture(event: any, zoomFactor: number): void {
+    if (this.modeService.mode === ViewerMode.DASHBOARD) {
+      this.toggleToPage();
+    } else {
+      this.zoomInAtPoint(event.center, zoomFactor);
+
+      const centerPt = this.viewer.viewport.pointFromPixel( event.center, true );
+      const lastCenterPt = this.viewer.viewport.pointFromPixel( event.lastCenter, true );
+      const panByPt = lastCenterPt.minus( centerPt );
+      this.viewer.viewport.panBy( panByPt, true );
+    }
+  }
   /**
    *
    * @param {Point} point to zoom to. If not set, the viewer will zoom to center
